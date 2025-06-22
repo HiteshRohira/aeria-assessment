@@ -1,0 +1,43 @@
+UI Development Assignment: Interactive Box Display (React/Next.js or Flutter)
+Objective
+Build a web or mobile application using React/Next.js or Flutter that generates square boxes based on a user-provided input, with interactive color changes.
+Requirements
+1. Input Field
+Description: Add a text input field at the top to accept a number ( N ) between 5 and 25 (inclusive). Constraints:
+Validate that ( N ) is an integer in [5, 25].
+Show an error message (e.g., below the input) for invalid inputs (non-numeric, out of range) and prevent box generation.
+2. Box Generation
+Description: Generate ( N ) square boxes with a red background color.
+Properties:
+Boxes must be square (e.g., 50x50 pixels).
+Include a small gap (e.g., 5px) between boxes.
+3. Box Layout
+Description: Arrange the ( N ) boxes in a simple, clear layout (e.g., a single column, row, or grid). Responsive/Adaptive Design:
+The layout should use 100% of the container’s width and scale for different screen sizes. Ensure boxes are visible and clickable on web (React/Next.js).
+4. Box Interaction
+Description:
+Page 1 of 2
+Clicking a box changes its color from red to green.
+Track the order of clicks.
+When all boxes are green, revert them to red, one per second, in the reverse order of clicks (last clicked turns red first).
+After all boxes are red, allow clicking to start again.
+5. Bonus: 'C' Shape Arrangement
+Description: Arrange the ( N ) boxes in a 'C' shape, as shown below.
+Patterns:
+For ( N = 5 ):
+□□
+□
+□□
+For ( N = 8 ):
+□□□
+□
+□
+□□□
+Constraints:
+Dynamically adjust the 'C' shape for ( N ) from 5 to 25.
+Maintain a clear 'C' with top, middle, and bottom sections.
+Deliverables
+Source Code:
+Submit a ZIP or GitHub repository.
+React/Next.js: Include package.json and source files.
+Page 2 of 2
