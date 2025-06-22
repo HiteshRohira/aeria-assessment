@@ -1,36 +1,46 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Box, BoxInput, StatusDisplay } from "@/lib/BoxComponents";
+import type { GridBoxState } from "@/lib/types";
+import { useBoxAnimation } from "@/lib/useBoxAnimation";
+import { useNumberInput } from "@/lib/useNumberInput";
 
 export const Route = createFileRoute("/bonus")({
 	component: BonusComponent,
 });
 
-interface BoxState {
-	id: number;
-	isGreen: boolean;
-	row: number;
-	col: number;
-}
-
 interface CShapeLayout {
-	boxes: BoxState[];
+	boxes: GridBoxState[];
 	rows: number;
 	cols: number;
 }
 
 function BonusComponent() {
-	const [n, setN] = useState<string>("");
-	const [error, setError] = useState<string>("");
 	const [layout, setLayout] = useState<CShapeLayout | null>(null);
-	const [clickedBoxes, setClickedBoxes] = useState<number[]>([]);
-	const [isAnimating, setIsAnimating] = useState(false);
-	const animationTimeouts = useRef<NodeJS.Timeout[]>([]);
+
+	const numberInput = useNumberInput({
+		min: 5,
+		max: 25,
+		errorMessage: "Number must be between 5 and 25 (inclusive)",
+	});
+
+	const { clickedBoxes, isAnimating, handleBoxClick, resetAnimation } =
+		useBoxAnimation({
+			boxes: layout?.boxes || [],
+			setBoxes: (updater) => {
+				setLayout((prevLayout) => {
+					if (!prevLayout) return prevLayout;
+					return {
+						...prevLayout,
+						boxes: updater(prevLayout.boxes),
+					};
+				});
+			},
+		});
 
 	const generateCShapeLayout = (numBoxes: number): CShapeLayout => {
-		const boxes: BoxState[] = [];
+		const boxes: GridBoxState[] = [];
 		let boxId = 0;
 
 		// Adjust for better C shape
@@ -93,111 +103,31 @@ function BonusComponent() {
 		};
 	};
 
-	const validateInput = (value: string): boolean => {
-		const num = Number.parseInt(value);
-		if (Number.isNaN(num)) {
-			setError("Please enter a valid number");
-			return false;
-		}
-		if (num < 5 || num > 25) {
-			setError("Number must be between 5 and 25 (inclusive)");
-			return false;
-		}
-		setError("");
-		return true;
-	};
-
 	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const value = e.target.value;
-		setN(value);
+		numberInput.handleChange(e);
 
+		const value = e.target.value;
 		if (value === "") {
-			setError("");
 			setLayout(null);
 			return;
 		}
 
-		if (validateInput(value)) {
-			const numBoxes = Number.parseInt(value);
+		// Validate current input directly instead of relying on async state
+		const num = Number.parseInt(value);
+		if (!Number.isNaN(num) && num >= 5 && num <= 25) {
+			const numBoxes = num;
 			const newLayout = generateCShapeLayout(numBoxes);
 			setLayout(newLayout);
-			setClickedBoxes([]);
-			setIsAnimating(false);
-			// Clear any existing timeouts
-			animationTimeouts.current.forEach((timeout) => clearTimeout(timeout));
-			animationTimeouts.current = [];
+			resetAnimation();
 		}
 	};
 
-	const handleBoxClick = useCallback(
-		(boxId: number) => {
-			if (isAnimating || !layout) return;
 
-			// Check if box is already green
-			const box = layout.boxes.find((b) => b.id === boxId);
-			if (!box || box.isGreen) return;
-
-			// Update boxes to green
-			setLayout((prevLayout) => {
-				if (!prevLayout) return prevLayout;
-				return {
-					...prevLayout,
-					boxes: prevLayout.boxes.map((b) =>
-						b.id === boxId ? { ...b, isGreen: true } : b,
-					),
-				};
-			});
-
-			// Add to clicked boxes stack
-			const newClickedBoxes = [...clickedBoxes, boxId];
-			setClickedBoxes(newClickedBoxes);
-
-			// Check if all boxes are green
-			const allGreen = layout.boxes.every((b) => b.id === boxId || b.isGreen);
-			if (allGreen) {
-				setIsAnimating(true);
-
-				// Revert boxes in reverse order (LIFO)
-				newClickedBoxes.reverse().forEach((clickedBoxId, index) => {
-					const timeout = setTimeout(
-						() => {
-							setLayout((currentLayout) => {
-								if (!currentLayout) return currentLayout;
-								return {
-									...currentLayout,
-									boxes: currentLayout.boxes.map((b) =>
-										b.id === clickedBoxId ? { ...b, isGreen: false } : b,
-									),
-								};
-							});
-
-							// If this is the last box to revert, reset the animation state
-							if (index === newClickedBoxes.length - 1) {
-								setIsAnimating(false);
-								setClickedBoxes([]);
-							}
-						},
-						(index + 1) * 1000,
-					);
-
-					animationTimeouts.current.push(timeout);
-				});
-			}
-		},
-		[clickedBoxes, isAnimating, layout],
-	);
-
-	// Cleanup timeouts on unmount
-	useEffect(() => {
-		return () => {
-			animationTimeouts.current.forEach((timeout) => clearTimeout(timeout));
-		};
-	}, []);
 
 	const renderCShapeGrid = () => {
 		if (!layout) return null;
 
-		const grid: (BoxState | null)[][] = Array(layout.rows)
+		const grid: (GridBoxState | null)[][] = Array(layout.rows)
 			.fill(null)
 			.map(() => Array(layout.cols).fill(null));
 
@@ -215,16 +145,11 @@ function BonusComponent() {
 						{row.map((box, colIndex) => (
 							<div key={`${rowIndex}-${colIndex}`} className="relative">
 								{box ? (
-									<button
-										type="button"
-										className={`
-                      w-12 h-12 border-2 border-gray-300 cursor-pointer
-                      transition-colors duration-200 hover:opacity-80
-                      ${box.isGreen ? "bg-green-500" : "bg-red-500"}
-                      ${isAnimating ? "cursor-not-allowed" : ""}
-                    `}
-										onClick={() => handleBoxClick(box.id)}
-										title={`Box ${box.id + 1}${clickedBoxes.includes(box.id) ? ` (clicked ${clickedBoxes.indexOf(box.id) + 1})` : ""}`}
+									<Box
+										box={box}
+										isAnimating={isAnimating}
+										clickedBoxes={clickedBoxes}
+										onBoxClick={handleBoxClick}
 									/>
 								) : (
 									<div className="w-12 h-12" /> // Empty space placeholder
@@ -246,28 +171,24 @@ function BonusComponent() {
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-6">
-					<div className="space-y-2">
-						<Label htmlFor="box-count">Enter number of boxes (5-25):</Label>
-						<Input
-							id="box-count"
-							type="number"
-							min="5"
-							max="25"
-							value={n}
-							onChange={handleInputChange}
-							placeholder="Enter a number between 5 and 25"
-							className={error ? "border-red-500" : ""}
-						/>
-						{error && <p className="text-sm text-red-500 mt-1">{error}</p>}
-					</div>
+					<BoxInput
+						value={numberInput.value}
+						error={numberInput.error}
+						onChange={handleInputChange}
+						min={5}
+						max={25}
+						label="Enter number of boxes (5-25):"
+						placeholder="Enter a number between 5 and 25"
+					/>
 
 					{layout && (
 						<div className="space-y-4">
-							<div className="text-center text-sm text-muted-foreground">
-								{isAnimating
-									? "Reverting colors..."
-									: `Click boxes to turn them green (${layout.boxes.filter((b) => b.isGreen).length}/${layout.boxes.length}) - C-Shape Layout`}
-							</div>
+							<StatusDisplay
+								isAnimating={isAnimating}
+								greenCount={layout.boxes.filter((b) => b.isGreen).length}
+								totalCount={layout.boxes.length}
+								layoutType="C-Shape Layout"
+							/>
 
 							<div className="flex justify-center">{renderCShapeGrid()}</div>
 						</div>
