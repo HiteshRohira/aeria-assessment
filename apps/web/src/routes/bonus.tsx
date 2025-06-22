@@ -11,7 +11,6 @@ export const Route = createFileRoute("/bonus")({
 interface BoxState {
 	id: number;
 	isGreen: boolean;
-	clickOrder: number | null;
 	row: number;
 	col: number;
 }
@@ -26,19 +25,13 @@ function BonusComponent() {
 	const [n, setN] = useState<string>("");
 	const [error, setError] = useState<string>("");
 	const [layout, setLayout] = useState<CShapeLayout | null>(null);
+	const [clickedBoxes, setClickedBoxes] = useState<number[]>([]);
 	const [isAnimating, setIsAnimating] = useState(false);
-	const [clickCount, setClickCount] = useState(0);
 	const animationTimeouts = useRef<NodeJS.Timeout[]>([]);
 
 	const generateCShapeLayout = (numBoxes: number): CShapeLayout => {
 		const boxes: BoxState[] = [];
 		let boxId = 0;
-
-		// Calculate dimensions for C shape
-		// For a C shape, we need at least 3 rows and the middle section should be about 1/3 of total
-		// const totalRows = Math.max(3, Math.ceil(numBoxes / 3));
-		// const topBottomSize = Math.floor((numBoxes - Math.max(1, Math.floor(totalRows / 3))) / 2);
-		// const middleSize = numBoxes - (topBottomSize * 2);
 
 		// Adjust for better C shape
 		let topSize: number
@@ -66,7 +59,6 @@ function BonusComponent() {
 			boxes.push({
 				id: boxId++,
 				isGreen: false,
-				clickOrder: null,
 				row: 0,
 				col: col,
 			});
@@ -78,7 +70,6 @@ function BonusComponent() {
 				boxes.push({
 					id: boxId++,
 					isGreen: false,
-					clickOrder: null,
 					row: row,
 					col: 0,
 				});
@@ -90,7 +81,6 @@ function BonusComponent() {
 			boxes.push({
 				id: boxId++,
 				isGreen: false,
-				clickOrder: null,
 				row: totalRowsNeeded - 1,
 				col: col,
 			});
@@ -131,7 +121,7 @@ function BonusComponent() {
 			const numBoxes = Number.parseInt(value);
 			const newLayout = generateCShapeLayout(numBoxes);
 			setLayout(newLayout);
-			setClickCount(0);
+			setClickedBoxes([]);
 			setIsAnimating(false);
 			// Clear any existing timeouts
 			animationTimeouts.current.forEach((timeout) => clearTimeout(timeout));
@@ -143,63 +133,58 @@ function BonusComponent() {
 		(boxId: number) => {
 			if (isAnimating || !layout) return;
 
+			// Check if box is already green
+			const box = layout.boxes.find((b) => b.id === boxId);
+			if (!box || box.isGreen) return;
+
+			// Update boxes to green
 			setLayout((prevLayout) => {
 				if (!prevLayout) return prevLayout;
-
-				const updatedBoxes = prevLayout.boxes.map((box) => {
-					if (box.id === boxId && !box.isGreen) {
-						return { ...box, isGreen: true, clickOrder: clickCount };
-					}
-					return box;
-				});
-
-				const newClickCount = clickCount + 1;
-				setClickCount(newClickCount);
-
-				// Check if all boxes are green
-				const allGreen = updatedBoxes.every((box) => box.isGreen);
-				if (allGreen) {
-					setIsAnimating(true);
-					// Sort boxes by click order (descending) to revert in reverse order
-					const sortedBoxes = [...updatedBoxes].sort(
-						(a, b) => (b.clickOrder || 0) - (a.clickOrder || 0),
-					);
-
-					sortedBoxes.forEach((box, index) => {
-						const timeout = setTimeout(
-							() => {
-								setLayout((currentLayout) => {
-									if (!currentLayout) return currentLayout;
-									return {
-										...currentLayout,
-										boxes: currentLayout.boxes.map((b) =>
-											b.id === box.id
-												? { ...b, isGreen: false, clickOrder: null }
-												: b,
-										),
-									};
-								});
-
-								// If this is the last box to revert, reset the animation state
-								if (index === sortedBoxes.length - 1) {
-									setIsAnimating(false);
-									setClickCount(0);
-								}
-							},
-							(index + 1) * 1000,
-						);
-
-						animationTimeouts.current.push(timeout);
-					});
-				}
-
 				return {
 					...prevLayout,
-					boxes: updatedBoxes,
+					boxes: prevLayout.boxes.map((b) =>
+						b.id === boxId ? { ...b, isGreen: true } : b,
+					),
 				};
 			});
+
+			// Add to clicked boxes stack
+			const newClickedBoxes = [...clickedBoxes, boxId];
+			setClickedBoxes(newClickedBoxes);
+
+			// Check if all boxes are green
+			const allGreen = layout.boxes.every((b) => b.id === boxId || b.isGreen);
+			if (allGreen) {
+				setIsAnimating(true);
+
+				// Revert boxes in reverse order (LIFO)
+				newClickedBoxes.reverse().forEach((clickedBoxId, index) => {
+					const timeout = setTimeout(
+						() => {
+							setLayout((currentLayout) => {
+								if (!currentLayout) return currentLayout;
+								return {
+									...currentLayout,
+									boxes: currentLayout.boxes.map((b) =>
+										b.id === clickedBoxId ? { ...b, isGreen: false } : b,
+									),
+								};
+							});
+
+							// If this is the last box to revert, reset the animation state
+							if (index === newClickedBoxes.length - 1) {
+								setIsAnimating(false);
+								setClickedBoxes([]);
+							}
+						},
+						(index + 1) * 1000,
+					);
+
+					animationTimeouts.current.push(timeout);
+				});
+			}
 		},
-		[clickCount, isAnimating, layout],
+		[clickedBoxes, isAnimating, layout],
 	);
 
 	// Cleanup timeouts on unmount
@@ -231,7 +216,7 @@ function BonusComponent() {
 							<div key={`${rowIndex}-${colIndex}`} className="relative">
 								{box ? (
 									<button
-									  type="button"
+										type="button"
 										className={`
                       w-12 h-12 border-2 border-gray-300 cursor-pointer
                       transition-colors duration-200 hover:opacity-80
@@ -239,7 +224,7 @@ function BonusComponent() {
                       ${isAnimating ? "cursor-not-allowed" : ""}
                     `}
 										onClick={() => handleBoxClick(box.id)}
-										title={`Box ${box.id + 1}${box.clickOrder !== null ? ` (clicked ${box.clickOrder + 1})` : ""}`}
+										title={`Box ${box.id + 1}${clickedBoxes.includes(box.id) ? ` (clicked ${clickedBoxes.indexOf(box.id) + 1})` : ""}`}
 									/>
 								) : (
 									<div className="w-12 h-12" /> // Empty space placeholder

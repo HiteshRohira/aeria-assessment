@@ -8,7 +8,6 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 - **TanStack Router** - File-based routing with full type safety
 - **TailwindCSS** - Utility-first CSS for rapid UI development
 - **shadcn/ui** - Reusable UI components
-- **Node.js** - Runtime environment
 - **Biome** - Linting and formatting
 
 ## Getting Started

@@ -11,15 +11,14 @@ export const Route = createFileRoute("/")({
 interface BoxState {
 	id: number;
 	isGreen: boolean;
-	clickOrder: number | null;
 }
 
 function HomeComponent() {
 	const [n, setN] = useState<string>("");
 	const [error, setError] = useState<string>("");
 	const [boxes, setBoxes] = useState<BoxState[]>([]);
+	const [clickedBoxes, setClickedBoxes] = useState<number[]>([]);
 	const [isAnimating, setIsAnimating] = useState(false);
-	const [clickCount, setClickCount] = useState(0);
 	const animationTimeouts = useRef<NodeJS.Timeout[]>([]);
 
 	const validateInput = (value: string): boolean => {
@@ -51,10 +50,9 @@ function HomeComponent() {
 			const newBoxes: BoxState[] = Array.from({ length: numBoxes }, (_, i) => ({
 				id: i,
 				isGreen: false,
-				clickOrder: null,
 			}));
 			setBoxes(newBoxes);
-			setClickCount(0);
+			setClickedBoxes([]);
 			setIsAnimating(false);
 			// Clear any existing timeouts
 			animationTimeouts.current.forEach((timeout) => clearTimeout(timeout));
@@ -66,54 +64,50 @@ function HomeComponent() {
 		(boxId: number) => {
 			if (isAnimating) return;
 
-			setBoxes((prevBoxes) => {
-				const updatedBoxes = prevBoxes.map((box) => {
-					if (box.id === boxId && !box.isGreen) {
-						return { ...box, isGreen: true, clickOrder: clickCount };
-					}
-					return box;
-				});
+			// Check if box is already green
+			const box = boxes.find((b) => b.id === boxId);
+			if (!box || box.isGreen) return;
 
-				const newClickCount = clickCount + 1;
-				setClickCount(newClickCount);
+			// Update boxes to green
+			setBoxes((prevBoxes) =>
+				prevBoxes.map((b) =>
+					b.id === boxId ? { ...b, isGreen: true } : b,
+				),
+			);
 
-				// Check if all boxes are green
-				const allGreen = updatedBoxes.every((box) => box.isGreen);
-				if (allGreen) {
-					setIsAnimating(true);
-					// Sort boxes by click order (descending) to revert in reverse order
-					const sortedBoxes = [...updatedBoxes].sort(
-						(a, b) => (b.clickOrder || 0) - (a.clickOrder || 0),
+			// Add to clicked boxes stack
+			const newClickedBoxes = [...clickedBoxes, boxId];
+			setClickedBoxes(newClickedBoxes);
+
+			// Check if all boxes are green
+			const allGreen = boxes.every((b) => b.id === boxId || b.isGreen);
+			if (allGreen) {
+				setIsAnimating(true);
+
+				// Revert boxes in reverse order (LIFO)
+				newClickedBoxes.reverse().forEach((clickedBoxId, index) => {
+					const timeout = setTimeout(
+						() => {
+							setBoxes((currentBoxes) =>
+								currentBoxes.map((b) =>
+									b.id === clickedBoxId ? { ...b, isGreen: false } : b,
+								),
+							);
+
+							// If this is the last box to revert, reset the animation state
+							if (index === newClickedBoxes.length - 1) {
+								setIsAnimating(false);
+								setClickedBoxes([]);
+							}
+						},
+						(index + 1) * 1000,
 					);
 
-					sortedBoxes.forEach((box, index) => {
-						const timeout = setTimeout(
-							() => {
-								setBoxes((currentBoxes) =>
-									currentBoxes.map((b) =>
-										b.id === box.id
-											? { ...b, isGreen: false, clickOrder: null }
-											: b,
-									),
-								);
-
-								// If this is the last box to revert, reset the animation state
-								if (index === sortedBoxes.length - 1) {
-									setIsAnimating(false);
-									setClickCount(0);
-								}
-							},
-							(index + 1) * 1000,
-						);
-
-						animationTimeouts.current.push(timeout);
-					});
-				}
-
-				return updatedBoxes;
-			});
+					animationTimeouts.current.push(timeout);
+				});
+			}
 		},
-		[clickCount, isAnimating],
+		[boxes, clickedBoxes, isAnimating],
 	);
 
 	// Cleanup timeouts on unmount
@@ -158,7 +152,7 @@ function HomeComponent() {
 							<div className="flex flex-wrap gap-2 justify-center">
 								{boxes.map((box) => (
 									<button
-									type="submit"
+										type="button"
 										key={box.id}
 										className={`
                       w-12 h-12 border-2 border-gray-300 cursor-pointer
@@ -167,7 +161,7 @@ function HomeComponent() {
                       ${isAnimating ? "cursor-not-allowed" : ""}
                     `}
 										onClick={() => handleBoxClick(box.id)}
-										title={`Box ${box.id + 1}${box.clickOrder !== null ? ` (clicked ${box.clickOrder + 1})` : ""}`}
+										title={`Box ${box.id + 1}${clickedBoxes.includes(box.id) ? ` (clicked ${clickedBoxes.indexOf(box.id) + 1})` : ""}`}
 									/>
 								))}
 							</div>
