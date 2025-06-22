@@ -26,9 +26,8 @@ Then, run the development server:
 pnpm dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
+Open [http://localhost:3000](http://localhost:3000) in your browser to see the web application.
 
-The API is running at [http://localhost:3000](http://localhost:3000).
 
 
 
@@ -38,7 +37,6 @@ The API is running at [http://localhost:3000](http://localhost:3000).
 aeria/
 ├── apps/
 │   ├── web/         # Frontend application (React + TanStack Router)
-│   └── server/      # Backend API (None, NONE)
 ```
 
 ## Available Scripts
