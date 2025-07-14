@@ -1,6 +1,6 @@
 # aeria
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Router, None, NONE, and more.
+Assessment for a company called [Aeria](https://www.aeria.world/). This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Router, None, NONE, and more.
 
 ## Features
 
